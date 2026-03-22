@@ -8,10 +8,10 @@ from AppKit import (NSWindow, NSTitledWindowMask, NSBackingStoreBuffered,
     NSDatePickerElementFlagYearMonthDay, NSDatePickerElementFlagHourMinuteSecond,
     NSCenterTextAlignment, NSApplication, NSApplicationActivationPolicyAccessory,
     NSFont, NSAttributedString, NSDictionary, NSDate, NSMakeRect, NSDatePicker,
-    NSButton, NSObject, NSBezelStyleRounded
+    NSButton, NSObject, NSBezelStyleRounded, NSMutableParagraphStyle,
+    NSBaselineOffsetAttributeName
 )
 import requests
-import subprocess
 from typing import Optional
 
 class Stopwatch(rumps.App):
@@ -121,7 +121,18 @@ class Stopwatch(rumps.App):
     def set_monospace_title(self, title_text):
         if hasattr(self._nsapp, 'nsstatusitem'):
             font = NSFont.monospacedSystemFontOfSize_weight_(14, 0.0)
-            attributes = NSDictionary.dictionaryWithObject_forKey_(font, "NSFont")
+            
+            # Create paragraph style for better alignment
+            paragraph_style = NSMutableParagraphStyle.alloc().init()
+            paragraph_style.setAlignment_(NSCenterTextAlignment)
+            
+            # Create attributes dictionary with font, paragraph style and baseline offset
+            attributes = {
+                "NSFont": font,
+                "NSParagraphStyle": paragraph_style,
+                NSBaselineOffsetAttributeName: 0
+            }
+            
             attributed_title = NSAttributedString.alloc().initWithString_attributes_(
                 title_text, attributes
             )
@@ -137,7 +148,8 @@ class Stopwatch(rumps.App):
                 
                 if (diff.days > 0):
                     self.stopwatch_epoch = None
-                    self.stopwatch_enabled = None
+                    self.stopwatch_enabled = False
+                    self.save_state()
                 else:
                     hours = total_seconds // 3600
                     minutes = (total_seconds % 3600) // 60
@@ -151,7 +163,8 @@ class Stopwatch(rumps.App):
                     MenuText += formatted_time
             else:
                 self.stopwatch_epoch = None
-                self.stopwatch_enabled = None
+                self.stopwatch_enabled = False
+                self.save_state()
 
         if self.date_comparison_enabled:
             if self.target_date:
@@ -188,13 +201,12 @@ class Stopwatch(rumps.App):
             progress = (now - start_of_year) / (end_of_year - start_of_year)
             percentage = progress * 100
 
-            MenuText += f" | 📅 {percentage:.1f}%" if MenuText else "📅 {percentage:.1f}%"
+            MenuText += f" | 📅 {percentage:.1f}%" if MenuText else f"📅 {percentage:.1f}%"
 
         
         if self.bus_status_enabled and self.last_bus_check:
             MenuText += f" | 🚌 {self.last_bus_check}" if MenuText else f"🚌 {self.last_bus_check}"
 
-        self.save_state()
         self.set_monospace_title(MenuText)
 
     @objc.python_method
@@ -231,6 +243,7 @@ class Stopwatch(rumps.App):
             sender.title = 'Disable Bus Status'
         else:
             sender.title = 'Enable Bus Status'
+        self.save_state()
 
     def toggle_year_progress(self, sender):
         self.year_progress_enabled = not self.year_progress_enabled
@@ -238,6 +251,7 @@ class Stopwatch(rumps.App):
             sender.title = 'Disable Year Progress'
         else:
             sender.title = 'Enable Year Progress'
+        self.save_state()
 
 class DatePickerWindowController(NSObject):
     window = objc.ivar('window')
